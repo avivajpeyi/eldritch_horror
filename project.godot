@@ -13,3 +13,16 @@ config_version=5
 config/name="eldritch_horror"
 config/features=PackedStringArray("4.7")
 config/icon="res://icon.svg"
+run/main_scene="res://src/environment/arena.tscn"
+
+[autoload]
+GameManager="*res://src/autoload/game_manager.gd"
+SignalBus="*res://src/autoload/signal_bus.gd"
+
+[input]
+move_forward={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":87)]}
+move_back={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":83)]}
+move_left={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":65)]}
+move_right={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":68)]}
+move_up={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":32)]}
+move_down={"deadzone": 0.5, "events": [Object(InputEventKey,"physical_keycode":4194322)]}
