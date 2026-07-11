@@ -1,13 +1,97 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=10 format=3]
+
 [ext_resource path="res://src/entities/monster/monster_core.gd" type="Script" id="1"]
-[sub_resource type="SphereShape3D" id="Shape"]
-radius = 1.2
-[sub_resource type="SphereMesh" id="Mesh"]
-radius = 1.2
-height = 2.4
+[ext_resource path="res://src/entities/monster/components/leg_anchor.tscn" type="PackedScene" id="2"]
+[ext_resource path="res://src/entities/monster/components/monster_head.tscn" type="PackedScene" id="4"]
+[ext_resource path="res://src/entities/monster/components/monster_attack_controller.gd" type="Script" id="6"]
+
+[sub_resource type="CapsuleShape3D" id="Shape"]
+radius = 1.85
+height = 5.2
+
+[sub_resource type="ParticleProcessMaterial" id="DropletProcess"]
+emission_shape = 1
+emission_sphere_radius = 2.2
+direction = Vector3(0, -1, 0)
+spread = 38.0
+gravity = Vector3(0, -1.8, 0)
+initial_velocity_min = 0.15
+initial_velocity_max = 0.75
+scale_min = 0.35
+scale_max = 1.15
+
+[sub_resource type="StandardMaterial3D" id="DropletMaterial"]
+albedo_color = Color(0.09, 0.001, 0.006, 0.78)
+roughness = 0.06
+transparency = 1
+
+[sub_resource type="SphereMesh" id="DropletMesh"]
+material = SubResource("DropletMaterial")
+radius = 0.045
+height = 0.22
+radial_segments = 6
+rings = 4
+
 [node name="MonsterCore" type="CharacterBody3D"]
 script = ExtResource("1")
-[node name="Body" type="MeshInstance3D" parent="."]
-mesh = SubResource("Mesh")
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+rotation = Vector3(1.5708, 0, 0)
 shape = SubResource("Shape")
+
+[node name="VisualRoot" type="Node3D" parent="."]
+
+[node name="MonsterHead" parent="VisualRoot" instance=ExtResource("4")]
+
+[node name="SlimeDroplets" type="GPUParticles3D" parent="VisualRoot"]
+amount = 48
+lifetime = 2.8
+randomness = 0.7
+visibility_aabb = AABB(-7, -7, -7, 14, 14, 14)
+process_material = SubResource("DropletProcess")
+draw_pass_1 = SubResource("DropletMesh")
+
+[node name="Legs" type="Node3D" parent="."]
+
+[node name="AttackController" type="Node" parent="."]
+script = ExtResource("6")
+
+[node name="LegFrontLeft" parent="Legs" instance=ExtResource("2")]
+position = Vector3(-1.82, 0.24, -1.94)
+rotation = Vector3(0, -0.45, -0.08)
+[node name="LegFrontRight" parent="Legs" instance=ExtResource("2")]
+position = Vector3(1.66, -0.18, -2.06)
+rotation = Vector3(0, 0.45, 0.08)
+[node name="LegMidFrontLeft" parent="Legs" instance=ExtResource("2")]
+position = Vector3(-2.26, -0.12, -0.82)
+rotation = Vector3(0, -1.05, -0.18)
+[node name="LegMidFrontRight" parent="Legs" instance=ExtResource("2")]
+position = Vector3(2.18, 0.31, -0.61)
+rotation = Vector3(0, 1.05, 0.18)
+[node name="LegMidBackLeft" parent="Legs" instance=ExtResource("2")]
+position = Vector3(-2.31, 0.2, 0.42)
+rotation = Vector3(0, -1.75, -0.2)
+[node name="LegMidBackRight" parent="Legs" instance=ExtResource("2")]
+position = Vector3(2.28, -0.11, 0.63)
+rotation = Vector3(0, 1.75, 0.2)
+[node name="LegSideBackLeft" parent="Legs" instance=ExtResource("2")]
+position = Vector3(-2.06, -0.24, 1.59)
+rotation = Vector3(0, -2.12, -0.22)
+[node name="LegSideBackRight" parent="Legs" instance=ExtResource("2")]
+position = Vector3(2.14, 0.2, 1.38)
+rotation = Vector3(0, 2.12, 0.22)
+[node name="LegBackLeft" parent="Legs" instance=ExtResource("2")]
+position = Vector3(-1.34, 0.29, 2.16)
+rotation = Vector3(0, -2.45, -0.12)
+[node name="LegBackRight" parent="Legs" instance=ExtResource("2")]
+position = Vector3(1.5, -0.16, 2.08)
+rotation = Vector3(0, 2.45, 0.12)
+
+[node name="DebugLabel" type="Label3D" parent="."]
+visible = false
+position = Vector3(0, 3.1, 0)
+text = "ANCHOR SPIDER"
+font_size = 27
+outline_size = 8
+modulate = Color(0.55, 1, 0.86, 0.85)
+billboard = 1

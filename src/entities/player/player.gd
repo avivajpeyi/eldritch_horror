@@ -1,27 +1,46 @@
-extends CharacterBody3D
-@export var move_speed := 7.0
-@export var look_sensitivity := 0.0025
-@export var vertical_speed := 5.0
-@onready var camera: Camera3D = $Camera3D
-var pitch := -0.15
+extends PlayerCharacter
+
+## Project adapter for the bundled FPS controller.
+## Keeps gameplay systems decoupled by publishing player movement through SignalBus.
+@export_category("Combat")
+@export var max_health := 100.0
+@export var damage_invulnerability := 0.35
+
+var health := 0.0
+var _invulnerability_timer := 0.0
+var _defeated := false
 
 func _ready() -> void:
+	super._ready()
 	add_to_group("player")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	health = max_health
+	SignalBus.player_damage_requested.connect(_on_damage_requested)
+	SignalBus.player_health_changed.emit(health, max_health)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * look_sensitivity)
-		pitch = clamp(pitch - event.relative.y * look_sensitivity, -1.35, 1.35)
-		camera.rotation.x = pitch
-	if event.is_action_pressed("ui_cancel"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-
-func _physics_process(_delta: float) -> void:
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var direction := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
-	velocity.x = direction.x * move_speed
-	velocity.z = direction.z * move_speed
-	velocity.y = Input.get_axis("move_down", "move_up") * vertical_speed
-	move_and_slide()
+func _physics_process(delta: float) -> void:
+	_invulnerability_timer = maxf(_invulnerability_timer - delta, 0.0)
+	super._physics_process(delta)
 	SignalBus.player_position_updated.emit(global_position)
+
+func _exit_tree() -> void:
+	if SignalBus.player_damage_requested.is_connected(_on_damage_requested):
+		SignalBus.player_damage_requested.disconnect(_on_damage_requested)
+
+func take_damage(amount: float, source_position := Vector3.ZERO, impulse := Vector3.ZERO) -> void:
+	if _defeated or _invulnerability_timer > 0.0 or amount <= 0.0:
+		return
+	health = clampf(health - amount, 0.0, max_health)
+	_invulnerability_timer = damage_invulnerability
+	var away := global_position - source_position
+	if impulse.is_zero_approx() and away.length_squared() > 0.01:
+		impulse = away.normalized() * 5.0 + Vector3.UP * 2.0
+	velocity += impulse
+	SignalBus.player_health_changed.emit(health, max_health)
+	if health <= 0.0:
+		_defeated = true
+		SignalBus.player_defeated.emit()
+		set_physics_process(false)
+
+func _on_damage_requested(amount: float, source_position: Vector3, impulse: Vector3) -> void:
+	take_damage(amount, source_position, impulse)

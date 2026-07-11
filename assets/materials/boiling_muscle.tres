@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bysrivumero1x"]
+
+[ext_resource type="Shader" uid="uid://dnlhvit51nouc" path="res://assets/shaders/boiling_slime.gdshader" id="1"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1")
+shader_parameter/flesh_color = Color(0.115, 0.004, 0.012, 1)
+shader_parameter/vein_color = Color(0.62, 0.012, 0.018, 1)
+shader_parameter/boil_strength = 0.055
+shader_parameter/boil_scale = 7.5
+shader_parameter/boil_speed = 1.55
