@@ -9,6 +9,7 @@ var rng : RandomNumberGenerator
 func get_current_weapon(current_weapon_ref : WeaponSlot) -> void:
 	#get current weapon resources
 	current_weapon = current_weapon_ref
+	SignalBus.weapon_element_changed.emit(_current_damage_type())
 	
 func shoot() -> void:
 	if !current_weapon.resources.is_shooting and (
@@ -116,10 +117,18 @@ func hitscan_shot(point_of_collision_hitscan : Vector3) -> void:
 		var collider_normal : Vector3 = hitscan_bullet_collision.normal 
 		var final_damage : int = 0
 		
-		if collider.is_in_group("Enemies") and collider.has_method("hitscan_hit"):
+		if collider.is_in_group("Enemies") and collider.has_method("hitscan_hit_typed"):
+			final_damage = current_weapon.resources.damage_per_proj * current_weapon.resources.damage_dropoff.sample(point_of_collision_hitscan.distance_to(global_position) / current_weapon.resources.max_range)
+			collider.hitscan_hit_typed(final_damage, _current_damage_type(), hitscan_bullet_direction, hitscan_bullet_collision.position)
+
+		elif collider.is_in_group("Enemies") and collider.has_method("hitscan_hit"):
 			final_damage = current_weapon.resources.damage_per_proj * current_weapon.resources.damage_dropoff.sample(point_of_collision_hitscan.distance_to(global_position) / current_weapon.resources.max_range)
 			collider.hitscan_hit(final_damage, hitscan_bullet_direction, hitscan_bullet_collision.position)
 		
+		elif collider.is_in_group("EnemiesHead") and collider.has_method("hitscan_hit_typed"):
+				final_damage = current_weapon.resources.damage_per_proj * current_weapon.resources.headshot_damage_mult * current_weapon.resources.damage_dropoff.sample(point_of_collision_hitscan.distance_to(global_position) / current_weapon.resources.max_range)
+				collider.hitscan_hit_typed(final_damage, _current_damage_type(), hitscan_bullet_direction, hitscan_bullet_collision.position)
+
 		elif collider.is_in_group("EnemiesHead") and collider.has_method("hitscan_hit"):
 				final_damage = current_weapon.resources.damage_per_proj * current_weapon.resources.headshot_damage_mult * current_weapon.resources.damage_dropoff.sample(point_of_collision_hitscan.distance_to(global_position) / current_weapon.resources.max_range)
 				collider.hitscan_hit(final_damage, hitscan_bullet_direction, hitscan_bullet_collision.position)
@@ -148,6 +157,7 @@ func projectile_shot(point_of_collision_projectile : Vector3) -> void:
 	proj_ins.global_transform = current_weapon.attack_point.global_transform
 	proj_ins.direction = projectile_direction
 	proj_ins.damage = current_weapon.resources.damage_per_proj
+	proj_ins.damage_type = _current_damage_type()
 	proj_ins.time_before_vanish = current_weapon.resources.proj_time_before_vanish
 	proj_ins.gravity_scale = current_weapon.resources.proj_gravity_val
 	proj_ins.is_explosive = current_weapon.resources.is_proj_explosive
@@ -155,3 +165,7 @@ func projectile_shot(point_of_collision_projectile : Vector3) -> void:
 	get_tree().get_root().add_child(proj_ins)
 	
 	proj_ins.set_linear_velocity(projectile_direction * current_weapon.resources.proj_move_speed)
+
+
+func _current_damage_type() -> int:
+	return GameManager.ElementType.KINETIC

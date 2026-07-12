@@ -1,0 +1,68 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/entities/minions/swarm_eye.gd" id="1_script"]
+[ext_resource type="ArrayMesh" path="res://assets/models/eye/mat.obj" id="2_eye"]
+
+[sub_resource type="SphereShape3D" id="EyeCollision"]
+radius = 0.52
+
+[sub_resource type="StandardMaterial3D" id="TrailMaterial"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.72, 0.04, 0.22, 0.72)
+emission_enabled = true
+emission = Color(0.9, 0.015, 0.16, 1)
+emission_energy_multiplier = 3.5
+billboard_mode = 1
+
+[sub_resource type="SphereMesh" id="TrailMesh"]
+material = SubResource("TrailMaterial")
+radius = 0.08
+height = 0.16
+radial_segments = 6
+rings = 4
+
+[sub_resource type="ParticleProcessMaterial" id="TrailProcess"]
+emission_shape = 1
+emission_sphere_radius = 0.16
+direction = Vector3(0, 0, 0)
+spread = 180.0
+gravity = Vector3(0, 0, 0)
+initial_velocity_min = 0.05
+initial_velocity_max = 0.25
+scale_min = 0.5
+scale_max = 1.35
+color = Color(0.9, 0.025, 0.18, 0.72)
+
+[node name="SwarmEye" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("EyeCollision")
+
+[node name="ModelRoot" type="Node3D" parent="."]
+scale = Vector3(12, 12, 12)
+
+[node name="EyeModel" type="MeshInstance3D" parent="ModelRoot"]
+position = Vector3(-0.0225, 0.0105, -0.293)
+rotation = Vector3(0, 3.14159, 0)
+mesh = ExtResource("2_eye")
+
+[node name="Trail" type="GPUParticles3D" parent="."]
+amount = 28
+lifetime = 0.85
+randomness = 0.35
+fixed_fps = 30
+local_coords = false
+visibility_aabb = AABB(-12, -12, -12, 24, 24, 24)
+process_material = SubResource("TrailProcess")
+draw_pass_1 = SubResource("TrailMesh")
+
+[node name="EyeGlow" type="OmniLight3D" parent="."]
+light_color = Color(1, 0.03, 0.13, 1)
+light_energy = 0.7
+omni_range = 2.6
+shadow_enabled = false

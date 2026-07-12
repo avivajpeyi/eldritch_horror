@@ -1,73 +1,256 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://src/ui/hud.gd" id="1_hud"]
 
-[sub_resource type="StyleBoxFlat" id="PanelStyle"]
-bg_color = Color(0.035, 0.02, 0.06, 0.9)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.45, 0.16, 0.62, 1)
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.025, 0.025, 0.03, 0.86)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.29, 0.32, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="BarBackground"]
+bg_color = Color(0.08, 0.085, 0.095, 0.95)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="EnemyFill"]
+bg_color = Color(0.78, 0.12, 0.18, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="PlayerFill"]
+bg_color = Color(0.22, 0.72, 0.42, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="EndPanel"]
+bg_color = Color(0.025, 0.025, 0.03, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.42, 0.43, 0.48, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[sub_resource type="StyleBoxFlat" id="MonsterBarStyle"]
-bg_color = Color(0.72, 0.05, 0.32, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
+[sub_resource type="StyleBoxFlat" id="Button"]
+bg_color = Color(0.14, 0.145, 0.16, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+content_margin_top = 9.0
+content_margin_bottom = 9.0
 
-[sub_resource type="StyleBoxFlat" id="PlayerBarStyle"]
-bg_color = Color(0.08, 0.32, 0.12, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
+[sub_resource type="StyleBoxFlat" id="ButtonHover"]
+bg_color = Color(0.24, 0.25, 0.28, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+content_margin_top = 9.0
+content_margin_bottom = 9.0
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
 
-[node name="BossHealthPanel" type="PanelContainer" parent="."]
+[node name="EnemyHealth" type="MarginContainer" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
 offset_left = 260.0
-offset_top = 24.0
-offset_right = 1020.0
-offset_bottom = 105.0
-theme_override_styles/panel = SubResource("PanelStyle")
+offset_top = 22.0
+offset_right = -260.0
+offset_bottom = 88.0
+grow_horizontal = 2
 
-[node name="Margin" type="MarginContainer" parent="BossHealthPanel"]
-theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 18
+[node name="Panel" type="PanelContainer" parent="EnemyHealth"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Margin" type="MarginContainer" parent="EnemyHealth/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 9
+theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="BossHealthPanel/Margin"]
-theme_override_constants/separation = 5
+[node name="VBox" type="VBoxContainer" parent="EnemyHealth/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
 
-[node name="HealthBar" type="ProgressBar" parent="BossHealthPanel/Margin/VBox"]
+[node name="Header" type="HBoxContainer" parent="EnemyHealth/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="EnemyHealth/Panel/Margin/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ENEMY HP"
+theme_override_colors/font_color = Color(0.88, 0.88, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="Value" type="Label" parent="EnemyHealth/Panel/Margin/VBox/Header"]
+layout_mode = 2
+text = "1000 / 1000"
+theme_override_colors/font_color = Color(0.72, 0.73, 0.76, 1)
+theme_override_font_sizes/font_size = 12
+
+[node name="HealthBar" type="ProgressBar" parent="EnemyHealth/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
 value = 100.0
 show_percentage = false
-theme_override_styles/fill = SubResource("MonsterBarStyle")
+theme_override_styles/background = SubResource("BarBackground")
+theme_override_styles/fill = SubResource("EnemyFill")
 
-[node name="PlayerHealthPanel" type="PanelContainer" parent="."]
-offset_left = 24.0
-offset_top = 620.0
-offset_right = 340.0
-offset_bottom = 700.0
-theme_override_styles/panel = SubResource("PanelStyle")
+[node name="PlayerStats" type="MarginContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 22.0
+offset_top = -126.0
+offset_right = 322.0
+offset_bottom = -22.0
+grow_vertical = 0
 
-[node name="Margin" type="MarginContainer" parent="PlayerHealthPanel"]
+[node name="Panel" type="PanelContainer" parent="PlayerStats"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Margin" type="MarginContainer" parent="PlayerStats/Panel"]
+layout_mode = 2
 theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 8
+theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="PlayerHealthPanel/Margin"]
+[node name="VBox" type="VBoxContainer" parent="PlayerStats/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
 
-[node name="HealthBar" type="ProgressBar" parent="PlayerHealthPanel/Margin/VBox"]
+[node name="HealthHeader" type="HBoxContainer" parent="PlayerStats/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PlayerStats/Panel/Margin/VBox/HealthHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "PLAYER HP"
+theme_override_colors/font_color = Color(0.88, 0.88, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="Value" type="Label" parent="PlayerStats/Panel/Margin/VBox/HealthHeader"]
+layout_mode = 2
+text = "100 / 100"
+theme_override_colors/font_color = Color(0.72, 0.73, 0.76, 1)
+theme_override_font_sizes/font_size = 12
+
+[node name="HealthBar" type="ProgressBar" parent="PlayerStats/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 9)
+layout_mode = 2
 value = 100.0
 show_percentage = false
-theme_override_styles/fill = SubResource("PlayerBarStyle")
+theme_override_styles/background = SubResource("BarBackground")
+theme_override_styles/fill = SubResource("PlayerFill")
+
+[node name="AmmoRow" type="HBoxContainer" parent="PlayerStats/Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PlayerStats/Panel/Margin/VBox/AmmoRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "PLAYER AMMO"
+theme_override_colors/font_color = Color(0.88, 0.88, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+
+[node name="Value" type="Label" parent="PlayerStats/Panel/Margin/VBox/AmmoRow"]
+layout_mode = 2
+text = "17  /  068"
+theme_override_colors/font_color = Color(0.96, 0.82, 0.36, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="EndScreen" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Dim" type="ColorRect" parent="EndScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.01, 0.012, 0.78)
+
+[node name="Center" type="CenterContainer" parent="EndScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="EndScreen/Center"]
+custom_minimum_size = Vector2(390, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("EndPanel")
+
+[node name="Margin" type="MarginContainer" parent="EndScreen/Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 28
+
+[node name="VBox" type="VBoxContainer" parent="EndScreen/Center/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="EndScreen/Center/Panel/Margin/VBox"]
+layout_mode = 2
+text = "ENEMY DEFEATED"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.94, 0.94, 0.96, 1)
+theme_override_font_sizes/font_size = 25
+
+[node name="Summary" type="Label" parent="EndScreen/Center/Panel/Margin/VBox"]
+layout_mode = 2
+text = "The horror has been put down."
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.65, 0.66, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="RestartButton" type="Button" parent="EndScreen/Center/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "RESTART"
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("ButtonHover")
+theme_override_styles/focus = SubResource("ButtonHover")
+
+[node name="QuitButton" type="Button" parent="EndScreen/Center/Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "QUIT"
+theme_override_styles/normal = SubResource("Button")
+theme_override_styles/hover = SubResource("ButtonHover")
+theme_override_styles/focus = SubResource("ButtonHover")

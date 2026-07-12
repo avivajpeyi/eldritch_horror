@@ -1,17 +1,28 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource path="res://src/entities/monster/monster_core.gd" type="Script" id="1"]
 [ext_resource path="res://src/entities/monster/components/leg_anchor.tscn" type="PackedScene" id="2"]
 [ext_resource path="res://src/entities/monster/components/monster_head.tscn" type="PackedScene" id="4"]
 [ext_resource path="res://src/entities/monster/components/monster_attack_controller.gd" type="Script" id="6"]
+[ext_resource path="res://src/entities/monster/components/contact_damage.gd" type="Script" id="7"]
+[ext_resource path="res://src/entities/monster/components/monster_anchor_weakpoint.gd" type="Script" id="8"]
+[ext_resource path="res://src/entities/monster/components/monster_anchor_visual.gd" type="Script" id="9"]
+[ext_resource path="res://src/entities/monster/components/monster_eye_weakpoint.gd" type="Script" id="10"]
+[ext_resource path="res://src/entities/monster/components/monster_tail.gd" type="Script" id="11"]
+[ext_resource path="res://assets/materials/boiling_muscle.tres" type="Material" id="12"]
+[ext_resource path="res://src/entities/monster/components/monster_mouth_weakpoint.gd" type="Script" id="13"]
+[ext_resource path="res://src/entities/monster/components/slime_tendril.gd" type="Script" id="14"]
 
 [sub_resource type="CapsuleShape3D" id="Shape"]
-radius = 1.85
-height = 5.2
+radius = 1.65
+height = 4.0
+
+[sub_resource type="SphereShape3D" id="ContactShape"]
+radius = 2.35
 
 [sub_resource type="ParticleProcessMaterial" id="DropletProcess"]
 emission_shape = 1
-emission_sphere_radius = 2.2
+emission_sphere_radius = 0.75
 direction = Vector3(0, -1, 0)
 spread = 38.0
 gravity = Vector3(0, -1.8, 0)
@@ -32,6 +43,27 @@ height = 0.22
 radial_segments = 6
 rings = 4
 
+[sub_resource type="SphereShape3D" id="AnchorShape"]
+radius = 0.62
+
+[sub_resource type="SphereShape3D" id="MouthShape"]
+radius = 0.48
+
+[sub_resource type="ImmediateMesh" id="TailMesh"]
+
+[sub_resource type="SphereMesh" id="AnchorMesh"]
+radius = 0.58
+height = 1.16
+radial_segments = 20
+rings = 12
+
+[sub_resource type="StandardMaterial3D" id="AnchorMaterial"]
+albedo_color = Color(1, 1, 1, 1)
+emission_enabled = true
+emission = Color(1, 1, 1, 1)
+emission_energy_multiplier = 3.0
+roughness = 0.25
+
 [node name="MonsterCore" type="CharacterBody3D"]
 script = ExtResource("1")
 
@@ -40,51 +72,169 @@ rotation = Vector3(1.5708, 0, 0)
 shape = SubResource("Shape")
 
 [node name="VisualRoot" type="Node3D" parent="."]
+scale = Vector3(2.15, 2.15, 2.15)
 
 [node name="MonsterHead" parent="VisualRoot" instance=ExtResource("4")]
 
 [node name="SlimeDroplets" type="GPUParticles3D" parent="VisualRoot"]
-amount = 48
+amount = 10
 lifetime = 2.8
 randomness = 0.7
 visibility_aabb = AABB(-7, -7, -7, 14, 14, 14)
 process_material = SubResource("DropletProcess")
 draw_pass_1 = SubResource("DropletMesh")
 
+[node name="Tail" type="MeshInstance3D" parent="." groups=["monster_flesh", "monster_limb_flesh"]]
+position = Vector3(0, 0.08, 1.48)
+mesh = SubResource("TailMesh")
+material_override = ExtResource("12")
+script = ExtResource("11")
+
+[node name="AttackTendrils" type="MeshInstance3D" parent="." groups=["monster_flesh", "monster_limb_flesh"]]
+script = ExtResource("14")
+tendril_count = 7
+curve_sections = 12
+radial_sides = 8
+base_radius = 0.28
+min_length = 2.4
+max_length = 4.8
+
 [node name="Legs" type="Node3D" parent="."]
 
 [node name="AttackController" type="Node" parent="."]
 script = ExtResource("6")
 
+[node name="ContactDamage" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("7")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ContactDamage"]
+shape = SubResource("ContactShape")
+
+[node name="Weakpoints" type="Node3D" parent="."]
+
+[node name="AnchorRed" type="AnimatableBody3D" parent="Weakpoints"]
+position = Vector3(-2.05, 0.55, -0.7)
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("8")
+anchor_id = &"ANCHOR_RED"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Weakpoints/AnchorRed"]
+shape = SubResource("AnchorShape")
+
+[node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorRed"]
+mesh = SubResource("AnchorMesh")
+material_override = SubResource("AnchorMaterial")
+script = ExtResource("9")
+anchor_id = &"ANCHOR_RED"
+
+[node name="Label" type="Label3D" parent="Weakpoints/AnchorRed"]
+position = Vector3(0, 0.86, 0)
+text = "WEAKPOINT"
+font_size = 22
+outline_size = 7
+modulate = Color(1, 0.82, 0.38, 0.95)
+billboard = 1
+
+[node name="AnchorBlue" type="AnimatableBody3D" parent="Weakpoints"]
+position = Vector3(2.05, 0.55, -0.7)
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("8")
+anchor_id = &"ANCHOR_BLUE"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Weakpoints/AnchorBlue"]
+shape = SubResource("AnchorShape")
+
+[node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorBlue"]
+mesh = SubResource("AnchorMesh")
+material_override = SubResource("AnchorMaterial")
+script = ExtResource("9")
+anchor_id = &"ANCHOR_BLUE"
+
+[node name="Label" type="Label3D" parent="Weakpoints/AnchorBlue"]
+position = Vector3(0, 0.86, 0)
+text = "WEAKPOINT"
+font_size = 22
+outline_size = 7
+modulate = Color(1, 0.82, 0.38, 0.95)
+billboard = 1
+
+[node name="AnchorGreen" type="AnimatableBody3D" parent="Weakpoints"]
+position = Vector3(0, 2.05, -0.25)
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("8")
+anchor_id = &"ANCHOR_GREEN"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Weakpoints/AnchorGreen"]
+shape = SubResource("AnchorShape")
+
+[node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorGreen"]
+mesh = SubResource("AnchorMesh")
+material_override = SubResource("AnchorMaterial")
+script = ExtResource("9")
+anchor_id = &"ANCHOR_GREEN"
+
+[node name="Label" type="Label3D" parent="Weakpoints/AnchorGreen"]
+position = Vector3(0, 0.86, 0)
+text = "WEAKPOINT"
+font_size = 22
+outline_size = 7
+modulate = Color(1, 0.82, 0.38, 0.95)
+billboard = 1
+
+[node name="CentralEyeHitbox" type="AnimatableBody3D" parent="Weakpoints"]
+position = Vector3(0, 0.42, -2.05)
+scale = Vector3(0.82, 0.58, 0.35)
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("10")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Weakpoints/CentralEyeHitbox"]
+shape = SubResource("AnchorShape")
+
+[node name="MouthWeakpoint" type="AnimatableBody3D" parent="Weakpoints"]
+position = Vector3(0, -0.82, -2.86)
+scale = Vector3(0.72, 0.5, 0.42)
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("13")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Weakpoints/MouthWeakpoint"]
+shape = SubResource("MouthShape")
+
 [node name="LegFrontLeft" parent="Legs" instance=ExtResource("2")]
-position = Vector3(-1.82, 0.24, -1.94)
+position = Vector3(-1.28, 0.18, -1.42)
 rotation = Vector3(0, -0.45, -0.08)
 [node name="LegFrontRight" parent="Legs" instance=ExtResource("2")]
-position = Vector3(1.66, -0.18, -2.06)
+position = Vector3(1.2, -0.14, -1.5)
 rotation = Vector3(0, 0.45, 0.08)
 [node name="LegMidFrontLeft" parent="Legs" instance=ExtResource("2")]
-position = Vector3(-2.26, -0.12, -0.82)
+position = Vector3(-1.62, -0.1, -0.68)
 rotation = Vector3(0, -1.05, -0.18)
 [node name="LegMidFrontRight" parent="Legs" instance=ExtResource("2")]
-position = Vector3(2.18, 0.31, -0.61)
+position = Vector3(1.55, 0.24, -0.5)
 rotation = Vector3(0, 1.05, 0.18)
 [node name="LegMidBackLeft" parent="Legs" instance=ExtResource("2")]
-position = Vector3(-2.31, 0.2, 0.42)
+position = Vector3(-1.7, 0.15, 0.28)
 rotation = Vector3(0, -1.75, -0.2)
 [node name="LegMidBackRight" parent="Legs" instance=ExtResource("2")]
-position = Vector3(2.28, -0.11, 0.63)
+position = Vector3(1.66, -0.08, 0.46)
 rotation = Vector3(0, 1.75, 0.2)
 [node name="LegSideBackLeft" parent="Legs" instance=ExtResource("2")]
-position = Vector3(-2.06, -0.24, 1.59)
+position = Vector3(-1.46, -0.18, 1.02)
 rotation = Vector3(0, -2.12, -0.22)
 [node name="LegSideBackRight" parent="Legs" instance=ExtResource("2")]
-position = Vector3(2.14, 0.2, 1.38)
+position = Vector3(1.52, 0.15, 0.94)
 rotation = Vector3(0, 2.12, 0.22)
 [node name="LegBackLeft" parent="Legs" instance=ExtResource("2")]
-position = Vector3(-1.34, 0.29, 2.16)
+position = Vector3(-0.82, 0.2, 1.54)
 rotation = Vector3(0, -2.45, -0.12)
 [node name="LegBackRight" parent="Legs" instance=ExtResource("2")]
-position = Vector3(1.5, -0.16, 2.08)
+position = Vector3(0.94, -0.12, 1.42)
 rotation = Vector3(0, 2.45, 0.12)
 
 [node name="DebugLabel" type="Label3D" parent="."]

@@ -8,6 +8,9 @@ var velocity := Vector3.ZERO
 var _stuck := false
 
 func _ready() -> void:
+	collision_layer = 0
+	# Layer 1 catches architecture; layer 2 catches the FPS player.
+	collision_mask = 3
 	monitoring = true
 	body_entered.connect(_on_body_entered)
 	var shape := CollisionShape3D.new()

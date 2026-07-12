@@ -1,282 +1,329 @@
 class_name MonsterHead
 extends Node3D
-## Rendering-only head aggregation. Player tracking arrives through SignalBus.
+## Rendering-only convergence knot. The locomotion tentacles are the creature;
+## this tiny fused mass only hides their roots and must never dominate silhouette.
 
-@export_range(5, 7) var core_lobe_count := 7
-@export_range(3, 5) var primary_eye_count := 5
-@export_range(15, 25) var swarm_eye_count := 22
-@export_range(3, 5) var flesh_bridge_count := 5
-@export var gaze_response := 7.5
-@export var pulse_amount := 0.075
+@export_range(2, 3) var core_lobe_count := 3
+@export var pulse_amount := 0.13
+@export var drift_amount := 0.08
+@export_category("Cyclopean Face")
+@export var eye_scale := Vector2(0.82, 0.58)
+@export_range(6, 12) var tooth_count := 9
+@export var jaw_open_distance := 0.38
 
 const FLESH_MATERIAL := preload("res://assets/materials/horror_flesh.tres")
-const MUSCLE_MATERIAL := preload("res://assets/materials/boiling_muscle.tres")
+const EYE_SHADER := preload("res://src/shaders/monster_eye.gdshader")
 
-var _rng := RandomNumberGenerator.new()
-var _player_position := Vector3.ZERO
-var _lobe_nodes: Array[CSGSphere3D] = []
-var _lobe_base_scales: Array[Vector3] = []
-var _lobe_phases: Array[float] = []
-var _eyes: Array[Node3D] = []
-var _normal_texture: ImageTexture
-var _flesh_texture: ImageTexture
+var _lobes: Array[CSGSphere3D] = []
+var _base_positions: Array[Vector3] = []
+var _base_scales: Array[Vector3] = []
+var _phases: Array[float] = []
+var _speeds: Array[float] = []
+var _noises: Array[FastNoiseLite] = []
 var _time := 0.0
-var _pulse_accumulator := 0.0
-var _signal_bus: Node
+var _update_accumulator := 0.0
+var _base_position := Vector3.ZERO
+var _base_rotation := Vector3.ZERO
+var _base_scale := Vector3.ONE
+var _agitation := 0.0
+var _agitation_target := 0.0
+var _blink := 0.0
+var _blink_timer := 1.8
+var _eye_material: ShaderMaterial
+var _eye_root: Node3D
+var _mouth_root: Node3D
+var _throat_material: StandardMaterial3D
+var _upper_teeth: Node3D
+var _lower_teeth: Node3D
+var _mouth_exposure := 0.0
+var _mouth_exposure_target := 0.0
+
 
 func _ready() -> void:
-	_signal_bus = get_node("/root/SignalBus")
-	_rng.seed = 0xE1D817C
-	_build_procedural_textures()
-	_build_lumpy_core()
-	_build_flesh_bridges()
-	_build_primary_eyes()
-	_build_swarm_eyes()
-	_build_micro_decals()
-	_signal_bus.connect("player_position_updated", _on_player_position_updated)
+	_base_position = position
+	_base_rotation = rotation
+	_base_scale = scale
+	_build_convergence_knot()
+	_build_cyclopean_face()
+	SignalBus.attack_phase_changed.connect(_on_attack_phase_changed)
+
 
 func _exit_tree() -> void:
-	if _signal_bus != null and _signal_bus.is_connected("player_position_updated", _on_player_position_updated):
-		_signal_bus.disconnect("player_position_updated", _on_player_position_updated)
+	if SignalBus.attack_phase_changed.is_connected(_on_attack_phase_changed):
+		SignalBus.attack_phase_changed.disconnect(_on_attack_phase_changed)
+
 
 func _process(delta: float) -> void:
 	_time += delta
-	_pulse_accumulator += delta
-	# CSG rebuilds are expensive; 12 Hz retains the malignant shifting motion
-	# without rebuilding seven unions every rendered frame.
-	if _pulse_accumulator >= 1.0 / 12.0:
-		_pulse_accumulator = 0.0
-		_pulse_lobes()
-	_update_gazes(delta)
+	_update_accumulator += delta
+	_agitation = move_toward(_agitation, _agitation_target, delta * (2.4 if _agitation_target > _agitation else 1.25))
+	_mouth_exposure = move_toward(_mouth_exposure, _mouth_exposure_target, delta * 4.8)
+	_update_face(delta)
+	_update_knot_transform(delta)
+	# The knot is small and the motion slow. Eight boolean rebuilds per second keep
+	# independent swelling visible without spending frame time on hidden detail.
+	if _update_accumulator >= 1.0 / 8.0:
+		_update_accumulator = 0.0
+		_update_lobes()
 
-func _build_lumpy_core() -> void:
+
+func _build_convergence_knot() -> void:
 	var combiner := CSGCombiner3D.new()
-	combiner.name = "FleshUnion"
+	combiner.name = "TentacleConvergenceKnot"
 	add_child(combiner)
-	for index in core_lobe_count:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0xE1D817C
+	var anatomy := [
+		[Vector3(-0.08, 0.02, 0.02), 0.72, Vector3(1.0, 0.78, 0.92)],
+		[Vector3(0.42, 0.2, 0.18), 0.52, Vector3(0.92, 1.05, 0.82)],
+		[Vector3(-0.3, -0.3, 0.25), 0.48, Vector3(1.08, 0.82, 0.9)],
+	]
+	for index in mini(core_lobe_count, anatomy.size()):
+		var datum: Array = anatomy[index]
 		var lobe := CSGSphere3D.new()
-		lobe.name = "Lobe_%02d" % index
+		lobe.name = "KnotLobe_%02d" % index
 		lobe.operation = CSGShape3D.OPERATION_UNION
-		lobe.radius = _rng.randf_range(1.15, 2.05)
-		lobe.radial_segments = 24
-		lobe.rings = 16
-		lobe.position = Vector3(
-			_rng.randf_range(-1.35, 1.35),
-			_rng.randf_range(-0.85, 1.05),
-			_rng.randf_range(-1.15, 1.25)
+		lobe.radius = datum[1]
+		lobe.radial_segments = 14
+		lobe.rings = 9
+		var base_position: Vector3 = datum[0] + Vector3(
+			rng.randf_range(-0.035, 0.035),
+			rng.randf_range(-0.03, 0.03),
+			rng.randf_range(-0.035, 0.035)
 		)
-		var base_scale := Vector3(
-			_rng.randf_range(0.75, 1.3),
-			_rng.randf_range(0.65, 1.2),
-			_rng.randf_range(0.72, 1.35)
-		)
+		var base_scale: Vector3 = datum[2]
+		lobe.position = base_position
 		lobe.scale = base_scale
+		lobe.rotation = Vector3(
+			rng.randf_range(-0.16, 0.16),
+			rng.randf_range(-0.18, 0.18),
+			rng.randf_range(-0.14, 0.14)
+		)
 		lobe.material = FLESH_MATERIAL
 		lobe.add_to_group("monster_flesh")
 		combiner.add_child(lobe)
-		_lobe_nodes.append(lobe)
-		_lobe_base_scales.append(base_scale)
-		_lobe_phases.append(_rng.randf_range(0.0, TAU))
+		_lobes.append(lobe)
+		_base_positions.append(base_position)
+		_base_scales.append(base_scale)
+		_phases.append(rng.randf_range(0.0, TAU))
+		_speeds.append(rng.randf_range(0.38, 0.72))
+		var noise := FastNoiseLite.new()
+		noise.seed = 0x51A7 + index * 3571
+		noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		noise.frequency = rng.randf_range(0.16, 0.24)
+		_noises.append(noise)
 
-func _pulse_lobes() -> void:
-	for index in _lobe_nodes.size():
-		var pulse := sin(_time * (0.8 + index * 0.07) + _lobe_phases[index]) * pulse_amount
-		var cross_pulse := cos(_time * 0.67 + _lobe_phases[index]) * pulse_amount * 0.45
-		_lobe_nodes[index].scale = _lobe_base_scales[index] * Vector3(1.0 + pulse, 1.0 - cross_pulse, 1.0 + cross_pulse)
 
-func _build_primary_eyes() -> void:
-	var placements := [
-		Vector3(0.0, 0.05, -2.25), Vector3(-1.15, 0.42, -1.75),
-		Vector3(1.2, 0.3, -1.65), Vector3(-0.55, -0.8, -1.85),
-		Vector3(0.72, -0.72, -1.72)
-	]
-	for index in primary_eye_count:
-		var scale_value := 1.15 if index == 0 else _rng.randf_range(0.62, 0.9)
-		var eye := _create_primary_eye(scale_value)
-		eye.position = placements[index]
-		add_child(eye)
-		_eyes.append(eye)
+func _build_cyclopean_face() -> void:
+	_eye_root = Node3D.new()
+	_eye_root.name = "CyclopeanFace"
+	add_child(_eye_root)
 
-func _create_primary_eye(size: float) -> Node3D:
-	var root := Node3D.new()
-	root.scale = Vector3.ONE * size
-	var sclera := MeshInstance3D.new()
-	var sclera_mesh := SphereMesh.new()
-	sclera_mesh.radius = 0.48
-	sclera_mesh.height = 0.84
-	sclera_mesh.radial_segments = 24
-	sclera_mesh.rings = 16
-	sclera.mesh = sclera_mesh
-	sclera.scale = Vector3(1.0, 0.78, 0.44)
-	var sclera_material := StandardMaterial3D.new()
-	sclera_material.albedo_color = Color(0.32, 0.055, 0.018)
-	sclera_material.roughness = 0.22
-	sclera_material.emission_enabled = true
-	sclera_material.emission = Color(0.62, 0.045, 0.004)
-	sclera_material.emission_energy_multiplier = 1.8
-	sclera.material_override = sclera_material
-	root.add_child(sclera)
-	var iris := MeshInstance3D.new()
-	var iris_mesh := SphereMesh.new()
-	iris_mesh.radius = 0.3
-	iris_mesh.height = 0.3
-	iris.mesh = iris_mesh
-	iris.position.z = -0.39
-	iris.scale = Vector3(1.0, 1.35, 0.18)
-	var iris_material := StandardMaterial3D.new()
-	iris_material.albedo_color = Color(0.95, 0.28, 0.005)
-	iris_material.emission_enabled = true
-	iris_material.emission = Color(1.0, 0.055, 0.002)
-	iris_material.emission_energy_multiplier = 3.8
-	iris.material_override = iris_material
-	root.add_child(iris)
-	var pupil := MeshInstance3D.new()
-	var pupil_mesh := CapsuleMesh.new()
-	pupil_mesh.radius = 0.055
-	pupil_mesh.height = 0.48
-	pupil.mesh = pupil_mesh
-	pupil.position.z = -0.56
-	pupil.scale = Vector3(0.42, 1.0, 0.18)
-	var pupil_material := StandardMaterial3D.new()
-	pupil_material.albedo_color = Color(0.002, 0.0, 0.0)
-	pupil_material.roughness = 0.03
-	pupil.material_override = pupil_material
-	root.add_child(pupil)
-	var cornea := MeshInstance3D.new()
-	var cornea_mesh := SphereMesh.new()
-	cornea_mesh.radius = 0.5
-	cornea_mesh.height = 0.86
-	cornea.mesh = cornea_mesh
-	cornea.scale = Vector3(1.02, 0.8, 0.46)
-	var cornea_material := StandardMaterial3D.new()
-	cornea_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	cornea_material.albedo_color = Color(0.6, 0.12, 0.08, 0.17)
-	cornea_material.roughness = 0.02
-	cornea_material.metallic_specular = 1.0
-	cornea.material_override = cornea_material
-	root.add_child(cornea)
-	return root
+	var socket := MeshInstance3D.new()
+	socket.name = "EyeSocket"
+	var socket_mesh := TorusMesh.new()
+	socket_mesh.inner_radius = 0.34
+	socket_mesh.outer_radius = 0.51
+	socket_mesh.rings = 20
+	socket_mesh.ring_segments = 8
+	socket_mesh.material = FLESH_MATERIAL
+	socket.mesh = socket_mesh
+	socket.position = Vector3(0.0, 0.19, -0.63)
+	socket.rotation.x = PI * 0.5
+	socket.scale = Vector3(1.0, 1.0, 0.72)
+	socket.add_to_group("monster_flesh")
+	_eye_root.add_child(socket)
 
-func _build_swarm_eyes() -> void:
-	for index in swarm_eye_count:
-		var eye := Node3D.new()
-		var angle := _rng.randf_range(0.0, TAU)
-		var elevation := _rng.randf_range(-0.85, 0.9)
-		var radial := _rng.randf_range(1.65, 2.25)
-		eye.position = Vector3(cos(angle) * radial, elevation * 1.55, sin(angle) * radial * 0.82)
-		var orb := MeshInstance3D.new()
-		var orb_mesh := SphereMesh.new()
-		orb_mesh.radius = _rng.randf_range(0.085, 0.19)
-		orb_mesh.height = orb_mesh.radius * 1.5
-		orb_mesh.radial_segments = 12
-		orb_mesh.rings = 8
-		orb.mesh = orb_mesh
-		orb.scale.z = 0.38
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.3, 0.0, 0.002)
-		material.emission_enabled = true
-		material.emission = Color(1.0, 0.002, 0.0)
-		material.emission_energy_multiplier = _rng.randf_range(2.5, 5.0)
-		material.roughness = 0.08
-		orb.material_override = material
-		eye.add_child(orb)
-		add_child(eye)
-		_eyes.append(eye)
+	var eye := MeshInstance3D.new()
+	eye.name = "UnblinkingEye"
+	var eye_mesh := QuadMesh.new()
+	eye_mesh.size = eye_scale
+	_eye_material = ShaderMaterial.new()
+	_eye_material.shader = EYE_SHADER
+	eye_mesh.material = _eye_material
+	eye.mesh = eye_mesh
+	eye.position = Vector3(0.0, 0.19, -0.738)
+	_eye_root.add_child(eye)
 
-func _update_gazes(delta: float) -> void:
-	for eye in _eyes:
-		var direction := _player_position - eye.global_position
-		if direction.length_squared() < 0.01:
-			continue
-		var up := global_basis.y
-		if absf(direction.normalized().dot(up)) > 0.96:
-			up = global_basis.x
-		var target_basis := Basis.looking_at(direction.normalized(), up).orthonormalized()
-		# Primary eye roots carry scale. Interpolate only normalized rotations,
-		# then restore scale instead of passing a scaled Basis to Quaternion.
-		var eye_scale := eye.global_basis.get_scale()
-		var current_rotation := eye.global_basis.orthonormalized().get_rotation_quaternion()
-		var target_rotation := target_basis.get_rotation_quaternion()
-		var blended_rotation := current_rotation.slerp(target_rotation, 1.0 - exp(-gaze_response * delta))
-		eye.global_basis = Basis(blended_rotation).scaled(eye_scale)
+	_build_hollow_mouth()
 
-func _build_flesh_bridges() -> void:
-	for index in flesh_bridge_count:
-		var from := Vector3(_rng.randf_range(-1.2, 1.2), _rng.randf_range(-0.7, 0.8), _rng.randf_range(-1.0, 1.0))
-		var to := -from * _rng.randf_range(0.65, 1.15) + Vector3(_rng.randf_range(-0.4, 0.4), _rng.randf_range(-0.3, 0.3), _rng.randf_range(-0.4, 0.4))
-		var bridge := MeshInstance3D.new()
-		bridge.mesh = _build_bridge_mesh(from, to, _rng.randf_range(0.18, 0.34))
-		bridge.material_override = MUSCLE_MATERIAL
-		bridge.add_to_group("monster_flesh")
-		add_child(bridge)
+	_upper_teeth = Node3D.new()
+	_upper_teeth.name = "UpperTeeth"
+	_upper_teeth.position = Vector3(0.0, -0.25, -0.755)
+	_eye_root.add_child(_upper_teeth)
+	_lower_teeth = Node3D.new()
+	_lower_teeth.name = "LowerTeeth"
+	_lower_teeth.position = Vector3(0.0, -0.51, -0.755)
+	_eye_root.add_child(_lower_teeth)
+	_build_teeth_row(_upper_teeth, false)
+	_build_teeth_row(_lower_teeth, true)
 
-func _build_bridge_mesh(from: Vector3, to: Vector3, radius: float) -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var bend := (from + to) * 0.5 + Vector3.UP * _rng.randf_range(-0.35, 0.45)
-	var previous := from
-	for section in 8:
-		var t := float(section + 1) / 8.0
-		var point := from.lerp(bend, t).lerp(bend.lerp(to, t), t)
-		_add_tube_section(tool, previous, point, radius * (1.0 - t * 0.25), radius * (1.0 - (t + 0.125) * 0.25), 8)
-		previous = point
-	tool.generate_normals()
-	return tool.commit()
 
-func _add_tube_section(tool: SurfaceTool, a: Vector3, b: Vector3, radius_a: float, radius_b: float, sides: int) -> void:
-	var forward := (b - a).normalized()
-	var side := forward.cross(Vector3.UP)
-	if side.length_squared() < 0.01:
-		side = forward.cross(Vector3.RIGHT)
-	side = side.normalized()
-	var up := forward.cross(side).normalized()
-	for face in sides:
-		var n0 := side * cos(TAU * face / sides) + up * sin(TAU * face / sides)
-		var n1 := side * cos(TAU * (face + 1) / sides) + up * sin(TAU * (face + 1) / sides)
-		var a0 := a + n0 * radius_a
-		var a1 := a + n1 * radius_a
-		var b0 := b + n0 * radius_b
-		var b1 := b + n1 * radius_b
-		tool.add_vertex(a0); tool.add_vertex(b0); tool.add_vertex(b1)
-		tool.add_vertex(a0); tool.add_vertex(b1); tool.add_vertex(a1)
+func _build_hollow_mouth() -> void:
+	_mouth_root = Node3D.new()
+	_mouth_root.name = "HollowMouth"
+	_mouth_root.position = Vector3(0.0, -0.38, 0.0)
+	_eye_root.add_child(_mouth_root)
 
-func _build_micro_decals() -> void:
-	for index in 18:
-		var decal := Decal.new()
-		var angle := _rng.randf_range(0.0, TAU)
-		var height_value := _rng.randf_range(-1.2, 1.25)
-		decal.position = Vector3(cos(angle) * 1.9, height_value, sin(angle) * 1.65)
-		decal.size = Vector3(_rng.randf_range(0.45, 1.15), _rng.randf_range(0.45, 1.25), 1.5)
-		decal.texture_normal = _normal_texture
-		decal.texture_albedo = _flesh_texture
-		decal.modulate = Color(0.42, 0.06, 0.075, _rng.randf_range(0.3, 0.62))
-		decal.rotation = Vector3(_rng.randf_range(-PI, PI), angle, _rng.randf_range(-PI, PI))
-		add_child(decal)
+	var rim := MeshInstance3D.new()
+	rim.name = "MouthRim"
+	var rim_mesh := TorusMesh.new()
+	rim_mesh.inner_radius = 0.36
+	rim_mesh.outer_radius = 0.51
+	rim_mesh.rings = 24
+	rim_mesh.ring_segments = 9
+	rim_mesh.material = FLESH_MATERIAL
+	rim.mesh = rim_mesh
+	rim.position.z = -0.67
+	rim.rotation.x = PI * 0.5
+	rim.scale = Vector3(1.0, 1.0, 0.54)
+	rim.add_to_group("monster_flesh")
+	_mouth_root.add_child(rim)
 
-func _build_procedural_textures() -> void:
-	const SIZE := 96
-	var height_map := PackedFloat32Array()
-	height_map.resize(SIZE * SIZE)
-	for y in SIZE:
-		for x in SIZE:
-			var uv := Vector2(float(x), float(y)) / SIZE
-			var fibers := sin((uv.x * 12.0 + sin(uv.y * 19.0) * 0.8) * TAU) * 0.28
-			var orifice := exp(-pow((uv - Vector2(0.5, 0.5)).length() * 5.2, 2.0))
-			height_map[y * SIZE + x] = fibers - orifice * 1.4
-	var normal_image := Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8)
-	var albedo_image := Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8)
-	for y in SIZE:
-		for x in SIZE:
-			var left := height_map[y * SIZE + posmod(x - 1, SIZE)]
-			var right := height_map[y * SIZE + (x + 1) % SIZE]
-			var down := height_map[posmod(y - 1, SIZE) * SIZE + x]
-			var up := height_map[((y + 1) % SIZE) * SIZE + x]
-			var normal := Vector3((left - right) * 2.4, (down - up) * 2.4, 1.0).normalized()
-			normal_image.set_pixel(x, y, Color(normal.x * 0.5 + 0.5, normal.y * 0.5 + 0.5, normal.z * 0.5 + 0.5, 1.0))
-			var h := height_map[y * SIZE + x]
-			albedo_image.set_pixel(x, y, Color(0.12 + h * 0.04, 0.008, 0.014, clampf(0.55 + absf(h) * 0.3, 0.0, 1.0)))
-	_normal_texture = ImageTexture.create_from_image(normal_image)
-	_flesh_texture = ImageTexture.create_from_image(albedo_image)
+	var tunnel := MeshInstance3D.new()
+	tunnel.name = "ThroatCavity"
+	var tunnel_mesh := CylinderMesh.new()
+	tunnel_mesh.top_radius = 0.46
+	tunnel_mesh.bottom_radius = 0.1
+	tunnel_mesh.height = 0.76
+	tunnel_mesh.radial_segments = 24
+	tunnel_mesh.rings = 5
+	tunnel_mesh.cap_top = false
+	tunnel_mesh.cap_bottom = false
+	var cavity_material := StandardMaterial3D.new()
+	cavity_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cavity_material.cull_mode = BaseMaterial3D.CULL_FRONT
+	cavity_material.albedo_color = Color(0.012, 0.0, 0.018, 1.0)
+	cavity_material.emission_enabled = true
+	cavity_material.emission = Color(0.055, 0.0, 0.08)
+	cavity_material.emission_energy_multiplier = 0.9
+	tunnel_mesh.material = cavity_material
+	tunnel.mesh = tunnel_mesh
+	tunnel.position.z = -1.0
+	tunnel.rotation.x = PI * 0.5
+	tunnel.scale = Vector3(1.0, 1.0, 0.54)
+	_mouth_root.add_child(tunnel)
 
-func _on_player_position_updated(position: Vector3) -> void:
-	_player_position = position
+	var throat_eye := MeshInstance3D.new()
+	throat_eye.name = "ThroatWeakpointGlow"
+	var throat_mesh := SphereMesh.new()
+	throat_mesh.radius = 0.12
+	throat_mesh.height = 0.24
+	throat_mesh.radial_segments = 16
+	throat_mesh.rings = 8
+	_throat_material = StandardMaterial3D.new()
+	_throat_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_throat_material.albedo_color = Color(0.02, 0.16, 0.34, 1.0)
+	_throat_material.emission_enabled = true
+	_throat_material.emission = Color(0.03, 0.42, 1.0)
+	_throat_material.emission_energy_multiplier = 0.25
+	throat_mesh.material = _throat_material
+	throat_eye.mesh = throat_mesh
+	throat_eye.position = Vector3(0.0, 0.0, -1.38)
+	throat_eye.scale = Vector3(1.0, 0.72, 0.45)
+	_mouth_root.add_child(throat_eye)
+
+
+func _build_teeth_row(row: Node3D, points_up: bool) -> void:
+	var tooth_material := StandardMaterial3D.new()
+	tooth_material.albedo_color = Color(0.56, 0.51, 0.4)
+	tooth_material.roughness = 0.72
+	tooth_material.emission_enabled = true
+	tooth_material.emission = Color(0.09, 0.035, 0.012)
+	tooth_material.emission_energy_multiplier = 0.55
+	for index in tooth_count:
+		var normalized := float(index) / maxf(float(tooth_count - 1), 1.0)
+		var x := lerpf(-0.39, 0.39, normalized)
+		var edge := absf(normalized - 0.5) * 2.0
+		var tooth := MeshInstance3D.new()
+		tooth.name = "Tooth_%02d" % index
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.0
+		mesh.bottom_radius = lerpf(0.045, 0.027, edge)
+		mesh.height = lerpf(0.19, 0.1, edge) * (0.82 + fmod(float(index) * 0.37, 0.3))
+		mesh.radial_segments = 5
+		mesh.rings = 1
+		mesh.material = tooth_material
+		tooth.mesh = mesh
+		tooth.position = Vector3(x, edge * 0.055 * (-1.0 if points_up else 1.0), 0.0)
+		tooth.rotation.z = (PI if points_up else 0.0) + x * (0.38 if points_up else -0.38)
+		row.add_child(tooth)
+
+
+func _update_face(delta: float) -> void:
+	_blink_timer -= delta
+	if _blink_timer <= 0.0:
+		_blink_timer = randf_range(2.4, 5.8) / (1.0 + _agitation * 0.6)
+		var blink_tween := create_tween()
+		blink_tween.tween_method(_set_blink, 0.0, 1.0, 0.075)
+		blink_tween.tween_method(_set_blink, 1.0, 0.0, 0.12)
+	_eye_material.set_shader_parameter("agitation", _agitation)
+	var jaw_open := (0.12 + _agitation * 0.48 + _mouth_exposure * 0.7) * jaw_open_distance
+	_upper_teeth.position.y = -0.27 + jaw_open * 0.25
+	_lower_teeth.position.y = -0.49 - jaw_open * 0.25
+	_mouth_root.scale = Vector3(1.0, 0.72 + jaw_open * 1.4, 1.0)
+	_throat_material.emission_energy_multiplier = lerpf(0.25, 6.0, _mouth_exposure)
+	_eye_root.rotation.z = sin(_time * (0.58 + _agitation * 1.8)) * (0.025 + _agitation * 0.035)
+
+
+func _set_blink(value: float) -> void:
+	_blink = value
+	if _eye_material != null:
+		_eye_material.set_shader_parameter("blink", value)
+
+
+func _update_lobes() -> void:
+	for index in _lobes.size():
+		var noise := _noises[index]
+		var phase := _phases[index]
+		var speed := _speeds[index]
+		var speed_multiplier := 1.0 + _agitation * 0.75
+		var amplitude_multiplier := 1.0 + _agitation * 0.65
+		var sample_time := _time * speed * speed_multiplier
+		var swelling: float = noise.get_noise_1d(sample_time + phase * 4.0) * pulse_amount * amplitude_multiplier
+		swelling += sin(_time * speed * 0.68 * speed_multiplier + phase) * pulse_amount * 0.38 * amplitude_multiplier
+		var cross: float = noise.get_noise_1d(sample_time * 0.71 + 51.0) * pulse_amount * 0.52 * amplitude_multiplier
+		_lobes[index].scale = _base_scales[index] * Vector3(
+			1.0 + swelling,
+			1.0 - swelling * 0.48 + cross,
+			1.0 + swelling * 0.62 - cross * 0.3
+		)
+		_lobes[index].position = _base_positions[index] + Vector3(
+			noise.get_noise_1d(sample_time * 0.53 + 17.0),
+			noise.get_noise_1d(sample_time * 0.47 + 73.0),
+			noise.get_noise_1d(sample_time * 0.41 + 131.0)
+		) * drift_amount * amplitude_multiplier
+
+
+func _update_knot_transform(delta: float) -> void:
+	var breath := sin(_time * 0.92) * 0.075
+	var cross_breath := sin(_time * 0.61 + 1.7) * 0.035
+	var active_tremor := sin(_time * 3.1 + 0.4) * 0.018 * _agitation
+	var target_scale := _base_scale * Vector3(
+		1.0 + breath + active_tremor,
+		1.0 - breath * 0.52 + cross_breath,
+		1.0 + breath * 0.7 - cross_breath * 0.3
+	)
+	var target_position := _base_position + Vector3(
+		sin(_time * 0.47 + 0.8) * 0.025,
+		sin(_time * 0.73) * 0.035 + active_tremor * 0.7,
+		cos(_time * 0.39 + 1.2) * 0.022
+	)
+	var target_rotation := _base_rotation + Vector3(
+		sin(_time * 0.43) * 0.055,
+		sin(_time * 0.31 + 1.1) * 0.065,
+		cos(_time * 0.37 + 2.0) * 0.05
+	)
+	var response := 1.0 - exp(-7.0 * delta)
+	scale = scale.lerp(target_scale, response)
+	position = position.lerp(target_position, response)
+	rotation = rotation.lerp(target_rotation, response)
+
+
+func _on_attack_phase_changed(attack_name: StringName, phase_name: StringName, _duration: float) -> void:
+	_mouth_exposure_target = 1.0 if attack_name in [&"Fleshy Shrapnel", &"Eye Swarm"] and phase_name in [&"TELEGRAPH", &"ACTIVE"] else 0.0
+	match phase_name:
+		&"TELEGRAPH": _agitation_target = 0.55
+		&"ACTIVE": _agitation_target = 1.0
+		&"RECOVERY": _agitation_target = 0.32
+		_: _agitation_target = 0.0

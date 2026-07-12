@@ -6,6 +6,7 @@ class_name Projectile
 var is_explosive : bool = false
 var direction : Vector3 
 var damage : float
+var damage_type : int = GameManager.ElementType.KINETIC
 var time_before_vanish : float 
 var bodies_list : Array = []
 
@@ -35,7 +36,13 @@ func hit() -> void:
 	if is_explosive: explode()
 
 func apply_damage(body : Node3D) -> void:
-	if body.is_in_group("Enemies") and body.has_method("projectile_hit"):
+	if body.is_in_group("Enemies") and body.has_method("projectile_hit_typed"):
+			body.projectile_hit_typed(damage, damage_type, direction)
+	elif body.is_in_group("Enemies") and body.has_method("projectile_hit"):
+			body.projectile_hit(damage, direction)
+	elif body.is_in_group("EnemiesHead") and body.has_method("projectile_hit_typed"):
+			body.projectile_hit_typed(damage, damage_type, direction)
+	elif body.is_in_group("EnemiesHead") and body.has_method("projectile_hit"):
 			body.projectile_hit(damage, direction)
 			
 	if body.is_in_group("HitableObjects") and body.has_method("projectile_hit"):

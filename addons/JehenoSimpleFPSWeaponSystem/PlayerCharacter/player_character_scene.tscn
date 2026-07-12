@@ -1550,7 +1550,7 @@ far = 1000.0
 unique_name_in_owner = true
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0.715, 0)
 script = ExtResource("14_2pclp")
-start_weapons = [NodePath("WeaponContainer/Pistol"), NodePath("WeaponContainer/AssaultRifle"), NodePath("WeaponContainer/Shotgun"), NodePath("WeaponContainer/SniperRifle"), NodePath("WeaponContainer/RocketLauncher")]
+start_weapons = [NodePath("WeaponContainer/Pistol")]
 
 [node name="WeaponContainer" type="Node3D" parent="WeaponManager" unique_id=1471997672]
 unique_name_in_owner = true
