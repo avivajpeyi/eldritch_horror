@@ -48,31 +48,31 @@ func _build_atmosphere() -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = ABYSS
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("273346")
-	environment.ambient_light_energy = 0.42
+	environment.ambient_light_color = Color("17202d")
+	environment.ambient_light_energy = 0.2
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment.glow_enabled = true
-	environment.glow_intensity = 0.85
-	environment.glow_strength = 0.72
+	environment.glow_intensity = 0.58
+	environment.glow_strength = 0.48
 	environment.ssao_enabled = true
 	environment.ssao_radius = 2.2
 	environment.ssao_intensity = 2.1
 	environment.fog_enabled = true
-	environment.fog_light_color = Color("182235")
-	environment.fog_light_energy = 0.55
-	environment.fog_density = 0.009
+	environment.fog_light_color = Color("101722")
+	environment.fog_light_energy = 0.34
+	environment.fog_density = 0.016
 	environment.fog_sky_affect = 0.22
 	world.environment = environment
 	add_child(world)
 
 	# A pale ritual key light, blue upper fill, and warm rim give the central fight
 	# space depth without flooding the chamber with a single purple value.
-	_add_omni_light(Vector3(0, 7.0, 0), RITUAL_GLOW, 9.5, 32.0)
-	_add_omni_light(Vector3(0, 20.0, -14.0), Color("7794be"), 5.5, 30.0)
-	_add_omni_light(Vector3(-18.0, 7.0, -21.0), Color("a9514c"), 3.5, 20.0)
+	_add_omni_light(Vector3(0, 5.0, 0), RITUAL_GLOW, 5.2, 27.0)
+	_add_omni_light(Vector3(0, 21.0, -14.0), Color("667c9d"), 2.4, 24.0)
+	_add_omni_light(Vector3(-18.0, 5.0, -21.0), Color("7e302f"), 2.0, 16.0)
 	for i in 4:
 		var angle := TAU * float(i) / 4.0 + PI * 0.25
-		_add_omni_light(Vector3(cos(angle) * 28.0, 7.0, sin(angle) * 28.0), Color("42587e"), 3.2, 22.0)
+		_add_omni_light(Vector3(cos(angle) * 28.0, 5.0, sin(angle) * 28.0), Color("34435d"), 1.15, 16.0)
 
 
 func _build_octagonal_chamber() -> void:

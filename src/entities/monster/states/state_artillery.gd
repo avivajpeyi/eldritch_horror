@@ -12,7 +12,7 @@ func cadence_multiplier() -> float:
 	return 1.12
 
 func cooldown_multiplier() -> float:
-	return 0.82
+	return 0.78
 
 func attack_pool(on_elevated_surface: bool) -> Array[StringName]:
 	if on_elevated_surface:

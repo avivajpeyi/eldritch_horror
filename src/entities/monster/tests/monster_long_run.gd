@@ -22,6 +22,7 @@ var attack_controller: Node
 var capture_count := 0
 var unsupported_frames := 0
 var failed := false
+var signal_bus: Node
 
 
 func _initialize() -> void:
@@ -35,6 +36,7 @@ func _initialize() -> void:
 	monster = arena.get_node("MonsterCore")
 	player = arena.get_node("Player")
 	attack_controller = monster.get_node("AttackController")
+	signal_bus = get_root().get_node("SignalBus")
 	var hud := arena.get_node_or_null("HUD")
 	if hud != null:
 		hud.visible = false
@@ -75,11 +77,11 @@ func _run() -> void:
 			player.velocity = Vector3.ZERO
 		if cycle_phases and frame == total_frames / 3:
 			monster.health = monster.max_health * 0.6
-			SignalBus.monster_health_changed.emit(monster.health, monster.max_health)
+			signal_bus.monster_health_changed.emit(monster.health, monster.max_health)
 			monster._update_encounter_phase()
 		elif cycle_phases and frame == (total_frames * 2) / 3:
 			monster.health = monster.max_health * 0.3
-			SignalBus.monster_health_changed.emit(monster.health, monster.max_health)
+			signal_bus.monster_health_changed.emit(monster.health, monster.max_health)
 			monster._update_encounter_phase()
 		_validate_support()
 		if frame == 1 or frame % capture_every == 0 or frame == total_frames - 1:
@@ -122,11 +124,11 @@ func _capture(frame: int) -> void:
 	var surface_normal: Vector3 = monster.surface_up.normalized()
 	var tangent: Vector3
 	if front_view:
-		# Match the side the real player is approaching from; a fixed local forward
-		# can accidentally capture the back after wall/ceiling reorientation.
-		tangent = (player.global_position - monster.global_position).slide(surface_normal).normalized()
+		# Follow the anatomical face after locomotion stopped forcing it toward the
+		# player. The cyclopean eye sits on the body's local forward (-Z) side.
+		tangent = (-monster.global_basis.z).slide(surface_normal).normalized()
 		if tangent.length_squared() < 0.01:
-			tangent = monster.global_basis.z.slide(surface_normal).normalized()
+			tangent = Vector3.FORWARD.slide(surface_normal).normalized()
 	else:
 		tangent = surface_normal.cross(Vector3.UP).normalized()
 		if tangent.length_squared() < 0.01:

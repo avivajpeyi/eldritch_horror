@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back, unshaded;
+render_mode blend_mix, depth_draw_opaque, cull_back;
 
 // Shape-first material: nearly black fill and one restrained silhouette rim.
 // The legacy parameter names remain so MonsterCore can keep one shared material.
@@ -29,8 +29,9 @@ void fragment() {
 	float facing = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
 	float rim = smoothstep(0.14, 0.92, 1.0 - facing);
 	float breathing_rim = 0.82 + slow_pulse * 0.18;
-	ALBEDO = base_color.rgb + edge_glow_color.rgb * rim * 0.16;
-	EMISSION = base_color.rgb * 0.35;
-	EMISSION += edge_glow_color.rgb * rim * edge_emission_strength * breathing_rim * 4.0;
+	ALBEDO = base_color.rgb + edge_glow_color.rgb * rim * 0.09;
+	ROUGHNESS = mix(0.24, 0.52, slow_pulse);
+	SPECULAR = 0.72;
+	EMISSION = edge_glow_color.rgb * rim * edge_emission_strength * breathing_rim * 1.35;
 	ALPHA = base_color.a;
 }

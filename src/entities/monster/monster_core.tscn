@@ -115,7 +115,7 @@ shape = SubResource("ContactShape")
 [node name="Weakpoints" type="Node3D" parent="."]
 
 [node name="AnchorRed" type="AnimatableBody3D" parent="Weakpoints"]
-position = Vector3(-2.05, 0.55, -0.7)
+position = Vector3(-1.35, 0.18, 0.62)
 collision_layer = 4
 collision_mask = 0
 script = ExtResource("8")
@@ -125,12 +125,14 @@ anchor_id = &"ANCHOR_RED"
 shape = SubResource("AnchorShape")
 
 [node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorRed"]
+scale = Vector3(0.86, 0.42, 0.32)
 mesh = SubResource("AnchorMesh")
 material_override = SubResource("AnchorMaterial")
 script = ExtResource("9")
 anchor_id = &"ANCHOR_RED"
 
 [node name="Label" type="Label3D" parent="Weakpoints/AnchorRed"]
+visible = false
 position = Vector3(0, 0.86, 0)
 text = "WEAKPOINT"
 font_size = 22
@@ -139,7 +141,7 @@ modulate = Color(1, 0.82, 0.38, 0.95)
 billboard = 1
 
 [node name="AnchorBlue" type="AnimatableBody3D" parent="Weakpoints"]
-position = Vector3(2.05, 0.55, -0.7)
+position = Vector3(1.38, 0.02, 0.7)
 collision_layer = 4
 collision_mask = 0
 script = ExtResource("8")
@@ -149,12 +151,14 @@ anchor_id = &"ANCHOR_BLUE"
 shape = SubResource("AnchorShape")
 
 [node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorBlue"]
+scale = Vector3(0.52, 0.8, 0.34)
 mesh = SubResource("AnchorMesh")
 material_override = SubResource("AnchorMaterial")
 script = ExtResource("9")
 anchor_id = &"ANCHOR_BLUE"
 
 [node name="Label" type="Label3D" parent="Weakpoints/AnchorBlue"]
+visible = false
 position = Vector3(0, 0.86, 0)
 text = "WEAKPOINT"
 font_size = 22
@@ -163,7 +167,7 @@ modulate = Color(1, 0.82, 0.38, 0.95)
 billboard = 1
 
 [node name="AnchorGreen" type="AnimatableBody3D" parent="Weakpoints"]
-position = Vector3(0, 2.05, -0.25)
+position = Vector3(0.42, 1.22, 0.68)
 collision_layer = 4
 collision_mask = 0
 script = ExtResource("8")
@@ -173,12 +177,14 @@ anchor_id = &"ANCHOR_GREEN"
 shape = SubResource("AnchorShape")
 
 [node name="Visual" type="MeshInstance3D" parent="Weakpoints/AnchorGreen"]
+scale = Vector3(0.42, 0.66, 0.3)
 mesh = SubResource("AnchorMesh")
 material_override = SubResource("AnchorMaterial")
 script = ExtResource("9")
 anchor_id = &"ANCHOR_GREEN"
 
 [node name="Label" type="Label3D" parent="Weakpoints/AnchorGreen"]
+visible = false
 position = Vector3(0, 0.86, 0)
 text = "WEAKPOINT"
 font_size = 22

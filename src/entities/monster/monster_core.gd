@@ -10,20 +10,22 @@ const ARTILLERY_STATE = preload("res://src/entities/monster/states/state_artille
 const NEST_STATE = preload("res://src/entities/monster/states/state_nest.gd")
 
 @export_category("Anchored Locomotion")
-@export var speed := 9.2
+@export var speed := 5.8
 @export var stopping_distance := 6.0
 @export var hover_height := 3.8
 @export var core_surface_probe_margin := 8.0
 @export var orientation_response := 9.0
+@export var travel_facing_response := 3.6
 @export var attachment_response := 7.5
 @export var locomotion_response := 12.0
 @export var surface_height_response := 8.5
-@export var travel_velocity_response := 14.0
-@export var max_attachment_speed := 16.0
+@export var travel_velocity_response := 8.0
+@export var max_attachment_speed := 10.0
 @export var step_settle_sag := 0.08
 @export var step_settle_response := 4.8
 @export var reaching_lean_radians := 0.1
-@export_range(1, 6) var max_simultaneous_steps := 5
+@export_range(1, 3) var max_simultaneous_steps := 2
+@export var gait_transfer_pause := 0.12
 @export var surface_transition_lock := 0.28
 @export var wall_climb_bias := 9.5
 @export var ceiling_contraction_speed := 4.6
@@ -31,8 +33,8 @@ const NEST_STATE = preload("res://src/entities/monster/states/state_nest.gd")
 @export var surface_route_scan_distance := 45.0
 @export var surface_route_duration_min := 3.8
 @export var surface_route_duration_max := 5.8
-@export var surface_route_cooldown_min := 1.4
-@export var surface_route_cooldown_max := 2.7
+@export var surface_route_cooldown_min := 7.0
+@export var surface_route_cooldown_max := 11.0
 @export_category("Anchored Surge")
 @export var jump_speed := 10.0
 @export var anchored_attack_max_speed := 11.0
@@ -50,16 +52,16 @@ const NEST_STATE = preload("res://src/entities/monster/states/state_nest.gd")
 @export_category("Flesh Shader")
 @export var flesh_base_color := Color(0.009, 0.011, 0.016, 1.0)
 @export var flesh_vein_color := Color(0.009, 0.011, 0.016, 1.0)
-@export var flesh_edge_glow_color := Color(0.018, 0.42, 0.29, 1.0)
+@export var flesh_edge_glow_color := Color(0.19, 0.012, 0.025, 1.0)
 @export_range(0.0, 8.0) var flesh_pulse_speed := 2.15
 @export_range(0.0, 0.5) var flesh_distortion_strength := 0.065
-@export_range(0.0, 5.0) var flesh_edge_emission_strength := 0.62
+@export_range(0.0, 5.0) var flesh_edge_emission_strength := 0.24
 @export_category("Boss Health")
 @export var max_health := 1000.0
 @export_range(0.35, 0.9) var artillery_phase_ratio := 0.67
 @export_range(0.1, 0.6) var nest_phase_ratio := 0.34
 @export_category("Structural Weakpoints")
-@export_range(0.0, 1.0) var armored_body_damage_ratio := 1.0
+@export_range(0.0, 1.0) var armored_body_damage_ratio := 0.08
 @export var anchor_max_health := 80.0
 @export_range(1, 3) var anchors_required_for_collapse := 2
 @export var exposure_duration := 5.0
@@ -114,6 +116,19 @@ var _exposure_timer := 0.0
 var _exposure_damage_taken := 0.0
 var _mouth_open := false
 var _mouth_element: int = GameManager.ElementType.BLUE
+var _facing_direction := Vector3.FORWARD
+var _active_gait_group := -1
+var _gait_group_cursor := 0
+var _gait_pause_timer := 0.0
+
+const GAIT_GROUPS: Array[Array] = [
+	[0, 5],
+	[1, 4],
+	[2, 7],
+	[3, 6],
+	[8],
+	[9],
+]
 
 @onready var debug_label: Label3D = $DebugLabel
 @onready var visual_root: Node3D = $VisualRoot
@@ -144,6 +159,9 @@ func _ready() -> void:
 	attack_controller.velocity_requested.connect(_on_attack_velocity_requested)
 	attack_controller.visual_compression_requested.connect(_on_attack_compression_requested)
 	_reset_anchors()
+	var initial_forward := (-global_basis.z).slide(surface_up).normalized()
+	if initial_forward.length_squared() > 0.01:
+		_facing_direction = initial_forward
 	# Arena collision is assembled by the parent scene in its ready callback.
 	call_deferred("_establish_initial_anchors")
 
@@ -232,7 +250,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_update_exposure(delta)
 	_surface_lock_timer = maxf(_surface_lock_timer - delta, 0.0)
-	_update_gait_permissions()
+	_update_gait_permissions(delta)
 	var can_attack := locomotion_mode == LocomotionMode.ANCHORED and not _defeated
 	attack_controller.set_attack_enabled(can_attack)
 	if can_attack:
@@ -278,6 +296,11 @@ func _update_anchored(delta: float) -> void:
 	_update_surface_orientation(delta)
 	_update_surface_route(delta)
 	var travel := _get_crawl_direction()
+	# Attacks are committed poses. Letting locomotion continue underneath every
+	# telegraph made the creature's intention unreadable and all ten limbs scramble.
+	var attack_phase: StringName = attack_controller.get_phase_name()
+	if attack_phase != &"IDLE" and not _attack_motion_override:
+		travel = Vector3.ZERO
 	_update_anchor_surface_transition(travel)
 	var drive_strength := 0.0
 	var cadence_multiplier: float = _state_profile.cadence_multiplier()
@@ -739,40 +762,74 @@ func _update_surface_orientation(delta: float) -> void:
 			for leg in legs:
 				leg.set_surface_direction(surface_up)
 
-	# The torso has no anatomical top, so its eye-facing axis remains world-stable
-	# while the independent limbs resolve floors, walls, pillars, and ceilings.
-	var forward := (player_position - global_position).slide(Vector3.UP).normalized()
-	if forward.length_squared() < 0.01:
-		forward = -global_basis.z.slide(Vector3.UP).normalized()
-	if forward.length_squared() < 0.01:
-		forward = Vector3.FORWARD
-	var target_basis := Basis.looking_at(forward, Vector3.UP)
-	global_basis = global_basis.slerp(target_basis, 1.0 - exp(-orientation_response * delta)).orthonormalized()
+	# The body follows its own momentum and contact plane. Looking directly at the
+	# player every frame made the entire anatomy behave like a camera-facing sprite.
+	var travel_forward := _smoothed_travel_velocity.slide(surface_up)
+	if _attack_motion_override and _attack_velocity.length_squared() > 0.25:
+		travel_forward = _attack_velocity.slide(surface_up)
+	if travel_forward.length_squared() > 0.5:
+		var desired_forward := travel_forward.normalized()
+		if _facing_direction.dot(desired_forward) < -0.82:
+			desired_forward = (_facing_direction + desired_forward * 0.35).slide(surface_up).normalized()
+		_facing_direction = _facing_direction.slerp(
+			desired_forward,
+			1.0 - exp(-travel_facing_response * delta)
+		).normalized()
+	else:
+		_facing_direction = _facing_direction.slide(surface_up).normalized()
+	if _facing_direction.length_squared() < 0.01:
+		_facing_direction = (-global_basis.z).slide(surface_up).normalized()
+	if _facing_direction.length_squared() < 0.01:
+		_facing_direction = Vector3.FORWARD
+	var target_basis := Basis.looking_at(_facing_direction, surface_up)
+	global_basis = global_basis.slerp(
+		target_basis,
+		1.0 - exp(-orientation_response * 0.55 * delta)
+	).orthonormalized()
 
 
 func _on_leg_step_started(_leg: Node) -> void:
-	_update_gait_permissions()
+	pass
 
 
 func _on_leg_step_finished(_leg: Node) -> void:
 	_step_settle_amount = 1.0
-	_update_gait_permissions()
 
 
-func _update_gait_permissions() -> void:
-	var step_limit := max_simultaneous_steps + (2 if _attack_motion_override else 0)
-	var stepping := 0
-	for leg in legs:
-		if leg.is_stepping:
-			stepping += 1
-	for leg in legs:
-		if leg.is_stepping:
-			leg.can_step = true
-		else:
-			# All waiting limbs may audition for an available slot. step_started is
-			# synchronous and closes the gate as soon as the limit is reached, so a
-			# ray miss can never deadlock the whole gait.
-			leg.can_step = stepping < step_limit
+func _update_gait_permissions(delta := 0.0) -> void:
+	_gait_pause_timer = maxf(_gait_pause_timer - delta, 0.0)
+	if _active_gait_group >= 0:
+		var active_indices: Array = GAIT_GROUPS[_active_gait_group]
+		var group_busy := false
+		for index in active_indices:
+			if index < legs.size() and (legs[index].is_stepping or legs[index].needs_step()):
+				group_busy = true
+				break
+		if not group_busy:
+			_gait_group_cursor = (_active_gait_group + 1) % GAIT_GROUPS.size()
+			_active_gait_group = -1
+			_gait_pause_timer = gait_transfer_pause
+
+	if _active_gait_group < 0 and _gait_pause_timer <= 0.0:
+		for offset in GAIT_GROUPS.size():
+			var candidate_group := (_gait_group_cursor + offset) % GAIT_GROUPS.size()
+			var candidate_indices: Array = GAIT_GROUPS[candidate_group]
+			var needs_transfer := false
+			for index in candidate_indices:
+				if index < legs.size() and legs[index].needs_step():
+					needs_transfer = true
+					break
+			if needs_transfer:
+				_active_gait_group = candidate_group
+				break
+
+	var allowed_indices: Array = [] if _active_gait_group < 0 else GAIT_GROUPS[_active_gait_group]
+	var allowed_count := 0
+	for index in legs.size():
+		var allowed := allowed_indices.has(index) and allowed_count < max_simultaneous_steps
+		legs[index].can_step = allowed or legs[index].is_stepping
+		if allowed and (legs[index].needs_step() or legs[index].is_stepping):
+			allowed_count += 1
 
 
 func _planted_leg_count() -> int:

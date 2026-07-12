@@ -17,14 +17,18 @@ const PhysicalProjectile = preload("res://src/entities/monster/components/physic
 const SWARM_EYE_SCENE: PackedScene = preload("res://src/entities/minions/swarm_eye.tscn")
 
 @export_category("Timing")
-@export var first_attack_delay := 2.5
-@export var attack_cooldown := 2.6
-@export var phase_change_delay := 0.75
+@export var first_attack_delay := 1.8
+@export var attack_cooldown := 1.75
+@export var phase_change_delay := 0.55
 @export_category("Damage")
 @export var pillar_leap_damage := 34.0
 @export var whip_damage := 28.0
 @export var shrapnel_damage := 16.0
 @export var sweep_damage := 32.0
+@export_category("Eye Swarm")
+@export_range(1, 8) var eye_swarm_limit := 6
+@export_range(1, 4) var eye_swarm_spawn_count := 3
+@export_range(1, 3) var eye_swarm_attack_slots := 2
 
 var current_attack := Attack.NONE
 var phase := Phase.IDLE
@@ -39,12 +43,17 @@ var _enabled := true
 var _last_attack := Attack.NONE
 var _encounter_state: GameManager.MonsterState = GameManager.MonsterState.ROAM
 var _state_profile: RefCounted = ROAM_STATE.new()
+var _active_eye_attackers: Dictionary = {}
+var _pending_eye_attackers: Array[int] = []
 
 
 func _ready() -> void:
 	_cooldown = first_attack_delay
 	SignalBus.player_position_updated.connect(_on_player_position)
 	SignalBus.monster_state_changed.connect(_on_monster_state_changed)
+	SignalBus.eye_swarm_attack_slot_requested.connect(_on_eye_attack_slot_requested)
+	SignalBus.eye_swarm_attack_slot_released.connect(_on_eye_attack_slot_released)
+	SignalBus.eye_swarm_member_removed.connect(_on_eye_member_removed)
 	_arena_root = get_tree().current_scene
 	if _arena_root == null and get_parent() != null:
 		_arena_root = get_parent().get_parent() as Node3D
@@ -56,6 +65,12 @@ func _exit_tree() -> void:
 		SignalBus.player_position_updated.disconnect(_on_player_position)
 	if SignalBus.monster_state_changed.is_connected(_on_monster_state_changed):
 		SignalBus.monster_state_changed.disconnect(_on_monster_state_changed)
+	if SignalBus.eye_swarm_attack_slot_requested.is_connected(_on_eye_attack_slot_requested):
+		SignalBus.eye_swarm_attack_slot_requested.disconnect(_on_eye_attack_slot_requested)
+	if SignalBus.eye_swarm_attack_slot_released.is_connected(_on_eye_attack_slot_released):
+		SignalBus.eye_swarm_attack_slot_released.disconnect(_on_eye_attack_slot_released)
+	if SignalBus.eye_swarm_member_removed.is_connected(_on_eye_member_removed):
+		SignalBus.eye_swarm_member_removed.disconnect(_on_eye_member_removed)
 
 
 func update_attack(delta: float, monster_position: Vector3, on_elevated_surface: bool) -> void:
@@ -452,14 +467,39 @@ func _ballistic_velocity(origin: Vector3, target: Vector3, horizontal_speed: flo
 
 
 func _spawn_eye_swarm(position: Vector3) -> void:
-	var available_slots := maxi(18 - get_tree().get_node_count_in_group("eye_swarm"), 0)
-	var spawn_count := mini(7, available_slots)
+	var available_slots := maxi(eye_swarm_limit - get_tree().get_node_count_in_group("eye_swarm"), 0)
+	var spawn_count := mini(eye_swarm_spawn_count, available_slots)
 	for index in spawn_count:
 		var eye := SWARM_EYE_SCENE.instantiate() as CharacterBody3D
 		_effect_root().add_child(eye)
 		var angle := TAU * float(index) / maxf(float(spawn_count), 1.0)
 		var offset := Vector3(cos(angle), randf_range(-0.8, 1.3), sin(angle)) * randf_range(1.8, 3.2)
 		eye.global_position = position + offset
+
+
+func _on_eye_attack_slot_requested(member_id: int) -> void:
+	if _active_eye_attackers.has(member_id) or _pending_eye_attackers.has(member_id):
+		return
+	_pending_eye_attackers.append(member_id)
+	_grant_pending_eye_slots()
+
+
+func _on_eye_attack_slot_released(member_id: int) -> void:
+	_active_eye_attackers.erase(member_id)
+	_grant_pending_eye_slots()
+
+
+func _on_eye_member_removed(member_id: int) -> void:
+	_active_eye_attackers.erase(member_id)
+	_pending_eye_attackers.erase(member_id)
+	_grant_pending_eye_slots()
+
+
+func _grant_pending_eye_slots() -> void:
+	while _active_eye_attackers.size() < eye_swarm_attack_slots and not _pending_eye_attackers.is_empty():
+		var member_id: int = _pending_eye_attackers.pop_front()
+		_active_eye_attackers[member_id] = true
+		SignalBus.eye_swarm_attack_slot_granted.emit(member_id)
 
 
 func _effect_root() -> Node3D:

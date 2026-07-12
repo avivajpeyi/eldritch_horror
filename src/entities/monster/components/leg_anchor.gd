@@ -10,7 +10,7 @@ signal step_finished(leg: MonsterLegAnchor)
 @export var max_leg_length := 16.0
 @export var step_threshold := 3.4
 @export var step_height := 1.8
-@export var step_duration := 0.28
+@export var step_duration := 0.42
 @export var probe_interval := 0.07
 @export var probe_outward_distance := 8.2
 @export var probe_surface_depth := 10.5
@@ -35,7 +35,7 @@ signal step_finished(leg: MonsterLegAnchor)
 @export var chain_spring := 74.0
 @export var chain_damping := 7.2
 @export var max_chain_speed := 22.0
-@export var noise_amplitude := 0.68
+@export var noise_amplitude := 0.24
 @export var behavior_interval_min := 4.0
 @export var behavior_interval_max := 9.0
 @export_range(0.75, 1.0) var hard_reach_ratio := 0.94
@@ -58,12 +58,15 @@ var surface_normal := Vector3.UP
 var is_stepping := false
 var is_planted := false
 var can_step := true
+var has_queued_step := false
 ## Smoothed load written by the core. Rendering consumes this value, but never
 ## feeds transforms back into locomotion.
 var pull_load := 0.0
 
 var _step_elapsed := 0.0
 var _step_origin := Vector3.ZERO
+var _queued_step_point := Vector3.ZERO
+var _queued_step_normal := Vector3.UP
 var _motion_time := 0.0
 var _phase_offset := 0.0
 var _probe_elapsed := 0.0
@@ -232,6 +235,7 @@ func _set_initial_foot(point: Vector3, normal: Vector3) -> void:
 	surface_normal = normal.normalized()
 	is_stepping = false
 	is_planted = true
+	has_queued_step = false
 
 
 func _probe_for_step() -> void:
@@ -248,8 +252,14 @@ func _probe_for_step() -> void:
 	var candidate: Vector3 = hit.position
 	var target_shifted := current_foot_global_pos.distance_to(candidate) > step_threshold
 	var changed_surface := surface_normal.dot(hit.normal) < 0.78
-	if can_step and (overstretched or target_shifted or changed_surface):
-		request_step(candidate, hit.normal)
+	if overstretched or target_shifted or changed_surface:
+		has_queued_step = true
+		_queued_step_point = candidate
+		_queued_step_normal = hit.normal
+		if can_step:
+			request_step(_queued_step_point, _queued_step_normal)
+	else:
+		has_queued_step = false
 
 
 func request_step(point: Vector3, normal: Vector3, instant := false) -> void:
@@ -258,6 +268,7 @@ func request_step(point: Vector3, normal: Vector3, instant := false) -> void:
 	if instant:
 		_set_initial_foot(point, normal)
 		return
+	has_queued_step = false
 	is_stepping = true
 	is_planted = false
 	_pull_load_target = 0.0
@@ -272,12 +283,17 @@ func release() -> void:
 	is_stepping = false
 	is_planted = false
 	can_step = false
+	has_queued_step = false
 	_pull_load_target = 0.0
 
 
 func enable_planting() -> void:
 	can_step = true
 	force_probe()
+
+
+func needs_step() -> bool:
+	return has_queued_step or not is_planted
 
 
 func force_probe(instant := false) -> bool:

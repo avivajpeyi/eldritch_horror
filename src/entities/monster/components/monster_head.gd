@@ -7,8 +7,8 @@ extends Node3D
 @export var pulse_amount := 0.13
 @export var drift_amount := 0.08
 @export_category("Cyclopean Face")
-@export var eye_scale := Vector2(0.82, 0.58)
-@export_range(6, 12) var tooth_count := 9
+@export var eye_scale := Vector2(0.54, 0.24)
+@export_range(4, 9) var tooth_count := 7
 @export var jaw_open_distance := 0.38
 
 const FLESH_MATERIAL := preload("res://assets/materials/horror_flesh.tres")
@@ -119,21 +119,6 @@ func _build_cyclopean_face() -> void:
 	_eye_root.name = "CyclopeanFace"
 	add_child(_eye_root)
 
-	var socket := MeshInstance3D.new()
-	socket.name = "EyeSocket"
-	var socket_mesh := TorusMesh.new()
-	socket_mesh.inner_radius = 0.34
-	socket_mesh.outer_radius = 0.51
-	socket_mesh.rings = 20
-	socket_mesh.ring_segments = 8
-	socket_mesh.material = FLESH_MATERIAL
-	socket.mesh = socket_mesh
-	socket.position = Vector3(0.0, 0.19, -0.63)
-	socket.rotation.x = PI * 0.5
-	socket.scale = Vector3(1.0, 1.0, 0.72)
-	socket.add_to_group("monster_flesh")
-	_eye_root.add_child(socket)
-
 	var eye := MeshInstance3D.new()
 	eye.name = "UnblinkingEye"
 	var eye_mesh := QuadMesh.new()
@@ -142,49 +127,70 @@ func _build_cyclopean_face() -> void:
 	_eye_material.shader = EYE_SHADER
 	eye_mesh.material = _eye_material
 	eye.mesh = eye_mesh
-	eye.position = Vector3(0.0, 0.19, -0.738)
+	eye.position = Vector3(-0.06, 0.21, -0.742)
+	eye.rotation.z = -0.11
 	_eye_root.add_child(eye)
+	_build_eye_occlusion()
 
 	_build_hollow_mouth()
 
 	_upper_teeth = Node3D.new()
 	_upper_teeth.name = "UpperTeeth"
-	_upper_teeth.position = Vector3(0.0, -0.25, -0.755)
+	_upper_teeth.position = Vector3(0.02, -0.27, -0.79)
+	_upper_teeth.rotation.z = 0.08
 	_eye_root.add_child(_upper_teeth)
 	_lower_teeth = Node3D.new()
 	_lower_teeth.name = "LowerTeeth"
-	_lower_teeth.position = Vector3(0.0, -0.51, -0.755)
+	_lower_teeth.position = Vector3(-0.04, -0.5, -0.79)
+	_lower_teeth.rotation.z = 0.13
 	_eye_root.add_child(_lower_teeth)
 	_build_teeth_row(_upper_teeth, false)
 	_build_teeth_row(_lower_teeth, true)
 
 
+func _build_eye_occlusion() -> void:
+	# Uneven flesh shelves hide the graphic outline of the eye. The player reads a
+	# wet organ caught inside a moving wound instead of a logo pasted on the body.
+	var lid_data := [
+		[Vector3(-0.12, 0.43, -0.77), Vector3(0.5, 0.13, 0.13), -0.18],
+		[Vector3(0.24, 0.38, -0.775), Vector3(0.31, 0.11, 0.12), 0.22],
+		[Vector3(-0.19, 0.02, -0.775), Vector3(0.38, 0.1, 0.12), 0.15],
+		[Vector3(0.24, 0.06, -0.78), Vector3(0.28, 0.085, 0.11), -0.27],
+	]
+	for index in lid_data.size():
+		var datum: Array = lid_data[index]
+		var lid := MeshInstance3D.new()
+		lid.name = "FleshLid_%02d" % index
+		var lid_mesh := SphereMesh.new()
+		lid_mesh.radius = 0.5
+		lid_mesh.height = 1.0
+		lid_mesh.radial_segments = 14
+		lid_mesh.rings = 8
+		lid_mesh.material = FLESH_MATERIAL
+		lid.mesh = lid_mesh
+		lid.position = datum[0]
+		lid.scale = datum[1]
+		lid.rotation.z = datum[2]
+		lid.add_to_group("monster_flesh")
+		_eye_root.add_child(lid)
+
+
 func _build_hollow_mouth() -> void:
 	_mouth_root = Node3D.new()
 	_mouth_root.name = "HollowMouth"
-	_mouth_root.position = Vector3(0.0, -0.38, 0.0)
+	_mouth_root.position = Vector3(0.03, -0.4, 0.0)
+	_mouth_root.rotation.z = 0.12
 	_eye_root.add_child(_mouth_root)
 
-	var rim := MeshInstance3D.new()
-	rim.name = "MouthRim"
-	var rim_mesh := TorusMesh.new()
-	rim_mesh.inner_radius = 0.36
-	rim_mesh.outer_radius = 0.51
-	rim_mesh.rings = 24
-	rim_mesh.ring_segments = 9
-	rim_mesh.material = FLESH_MATERIAL
-	rim.mesh = rim_mesh
-	rim.position.z = -0.67
-	rim.rotation.x = PI * 0.5
-	rim.scale = Vector3(1.0, 1.0, 0.54)
-	rim.add_to_group("monster_flesh")
-	_mouth_root.add_child(rim)
+	_build_wound_lip("UpperWoundLip", Vector3(-0.04, 0.1, -0.735), Vector3(0.48, 0.09, 0.12), -0.08)
+	_build_wound_lip("LowerWoundLip", Vector3(0.05, -0.11, -0.74), Vector3(0.43, 0.075, 0.11), 0.17)
+	_build_wound_lip("LeftWoundKnot", Vector3(-0.43, 0.0, -0.73), Vector3(0.13, 0.17, 0.12), -0.3)
 
 	var tunnel := MeshInstance3D.new()
 	tunnel.name = "ThroatCavity"
 	var tunnel_mesh := CylinderMesh.new()
-	tunnel_mesh.top_radius = 0.46
-	tunnel_mesh.bottom_radius = 0.1
+	tunnel_mesh.top_radius = 0.34
+	tunnel_mesh.bottom_radius = 0.07
 	tunnel_mesh.height = 0.76
 	tunnel_mesh.radial_segments = 24
 	tunnel_mesh.rings = 5
@@ -201,7 +207,7 @@ func _build_hollow_mouth() -> void:
 	tunnel.mesh = tunnel_mesh
 	tunnel.position.z = -1.0
 	tunnel.rotation.x = PI * 0.5
-	tunnel.scale = Vector3(1.0, 1.0, 0.54)
+	tunnel.scale = Vector3(0.95, 1.0, 0.38)
 	_mouth_root.add_child(tunnel)
 
 	var throat_eye := MeshInstance3D.new()
@@ -216,12 +222,29 @@ func _build_hollow_mouth() -> void:
 	_throat_material.albedo_color = Color(0.02, 0.16, 0.34, 1.0)
 	_throat_material.emission_enabled = true
 	_throat_material.emission = Color(0.03, 0.42, 1.0)
-	_throat_material.emission_energy_multiplier = 0.25
+	_throat_material.emission_energy_multiplier = 0.08
 	throat_mesh.material = _throat_material
 	throat_eye.mesh = throat_mesh
 	throat_eye.position = Vector3(0.0, 0.0, -1.38)
-	throat_eye.scale = Vector3(1.0, 0.72, 0.45)
+	throat_eye.scale = Vector3(0.76, 0.5, 0.32)
 	_mouth_root.add_child(throat_eye)
+
+
+func _build_wound_lip(name_value: String, position_value: Vector3, scale_value: Vector3, rotation_value: float) -> void:
+	var lip := MeshInstance3D.new()
+	lip.name = name_value
+	var lip_mesh := SphereMesh.new()
+	lip_mesh.radius = 0.5
+	lip_mesh.height = 1.0
+	lip_mesh.radial_segments = 14
+	lip_mesh.rings = 8
+	lip_mesh.material = FLESH_MATERIAL
+	lip.mesh = lip_mesh
+	lip.position = position_value
+	lip.scale = scale_value
+	lip.rotation.z = rotation_value
+	lip.add_to_group("monster_flesh")
+	_mouth_root.add_child(lip)
 
 
 func _build_teeth_row(row: Node3D, points_up: bool) -> void:
@@ -231,22 +254,26 @@ func _build_teeth_row(row: Node3D, points_up: bool) -> void:
 	tooth_material.emission_enabled = true
 	tooth_material.emission = Color(0.09, 0.035, 0.012)
 	tooth_material.emission_energy_multiplier = 0.55
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 0x7EE7 + (91 if points_up else 0)
 	for index in tooth_count:
+		if index in ([1, 5] if points_up else [2, 6]):
+			continue
 		var normalized := float(index) / maxf(float(tooth_count - 1), 1.0)
-		var x := lerpf(-0.39, 0.39, normalized)
+		var x := lerpf(-0.34, 0.34, normalized) + rng.randf_range(-0.025, 0.025)
 		var edge := absf(normalized - 0.5) * 2.0
 		var tooth := MeshInstance3D.new()
 		tooth.name = "Tooth_%02d" % index
 		var mesh := CylinderMesh.new()
 		mesh.top_radius = 0.0
 		mesh.bottom_radius = lerpf(0.045, 0.027, edge)
-		mesh.height = lerpf(0.19, 0.1, edge) * (0.82 + fmod(float(index) * 0.37, 0.3))
+		mesh.height = lerpf(0.17, 0.07, edge) * rng.randf_range(0.68, 1.18)
 		mesh.radial_segments = 5
 		mesh.rings = 1
 		mesh.material = tooth_material
 		tooth.mesh = mesh
-		tooth.position = Vector3(x, edge * 0.055 * (-1.0 if points_up else 1.0), 0.0)
-		tooth.rotation.z = (PI if points_up else 0.0) + x * (0.38 if points_up else -0.38)
+		tooth.position = Vector3(x, edge * 0.045 * (-1.0 if points_up else 1.0) + rng.randf_range(-0.018, 0.018), 0.0)
+		tooth.rotation.z = (PI if points_up else 0.0) + x * (0.42 if points_up else -0.42) + rng.randf_range(-0.2, 0.2)
 		row.add_child(tooth)
 
 
@@ -258,11 +285,14 @@ func _update_face(delta: float) -> void:
 		blink_tween.tween_method(_set_blink, 0.0, 1.0, 0.075)
 		blink_tween.tween_method(_set_blink, 1.0, 0.0, 0.12)
 	_eye_material.set_shader_parameter("agitation", _agitation)
-	var jaw_open := (0.12 + _agitation * 0.48 + _mouth_exposure * 0.7) * jaw_open_distance
+	var jaw_open := (_agitation * 0.48 + _mouth_exposure * 0.82) * jaw_open_distance
 	_upper_teeth.position.y = -0.27 + jaw_open * 0.25
 	_lower_teeth.position.y = -0.49 - jaw_open * 0.25
-	_mouth_root.scale = Vector3(1.0, 0.72 + jaw_open * 1.4, 1.0)
-	_throat_material.emission_energy_multiplier = lerpf(0.25, 6.0, _mouth_exposure)
+	var teeth_revealed := _agitation > 0.42 or _mouth_exposure > 0.16
+	_upper_teeth.visible = teeth_revealed
+	_lower_teeth.visible = teeth_revealed
+	_mouth_root.scale = Vector3(1.0, 0.1 + jaw_open * 2.6, 1.0)
+	_throat_material.emission_energy_multiplier = lerpf(0.08, 3.2, _mouth_exposure)
 	_eye_root.rotation.z = sin(_time * (0.58 + _agitation * 1.8)) * (0.025 + _agitation * 0.035)
 
 
